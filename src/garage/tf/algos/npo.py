@@ -171,7 +171,6 @@ class NPO(BatchPolopt):
 
         """
         policy_opt_input_values = self._policy_opt_input_values(samples_data)
-        # Train policy network
         logger.log('Computing loss before')
         loss_before = self._optimizer.loss(policy_opt_input_values)
         logger.log('Computing KL before')
@@ -182,6 +181,9 @@ class NPO(BatchPolopt):
         policy_kl = self._f_policy_kl(*policy_opt_input_values)
         logger.log('Computing loss after')
         loss_after = self._optimizer.loss(policy_opt_input_values)
+        adv = self._f_adv(*policy_opt_input_values)
+        # import pdb
+        # pdb.set_trace()
         tabular.record('{}/LossBefore'.format(self.policy.name), loss_before)
         tabular.record('{}/LossAfter'.format(self.policy.name), loss_after)
         tabular.record('{}/dLoss'.format(self.policy.name),
@@ -192,7 +194,7 @@ class NPO(BatchPolopt):
         pol_ent = self._f_policy_entropy(*policy_opt_input_values)
         tabular.record('{}/Entropy'.format(self.policy.name), np.mean(pol_ent))
 
-        self._fit_baseline(samples_data)
+        # self._fit_baseline(samples_data)
 
     def _build_inputs(self):
         """Build input variables.
@@ -225,6 +227,9 @@ class NPO(BatchPolopt):
             baseline_var = new_tensor(name='baseline',
                                       ndim=2,
                                       dtype=tf.float32)
+            adv_var = new_tensor(name='adv',
+                                 ndim=2,
+                                 dtype=tf.float32)
 
             policy_state_info_vars = {
                 k: tf.compat.v1.placeholder(tf.float32,
@@ -296,6 +301,7 @@ class NPO(BatchPolopt):
             action_var=action_var,
             reward_var=reward_var,
             baseline_var=baseline_var,
+            adv_var=adv_var,
             valid_var=valid_var,
             policy_state_info_vars=policy_state_info_vars,
             policy_old_dist_info_vars=policy_old_dist_info_vars,
@@ -308,6 +314,7 @@ class NPO(BatchPolopt):
             action_var=action_var,
             reward_var=reward_var,
             baseline_var=baseline_var,
+            adv_var=adv_var,
             valid_var=valid_var,
             policy_state_info_vars_list=policy_state_info_vars_list,
             policy_old_dist_info_vars_list=policy_old_dist_info_vars_list,
@@ -337,20 +344,20 @@ class NPO(BatchPolopt):
                                           policy_entropy)
 
         with tf.name_scope('policy_loss'):
-            adv = compute_advantages(self.discount,
-                                     self.gae_lambda,
-                                     self.max_path_length,
-                                     i.baseline_var,
-                                     rewards,
-                                     name='adv')
-
+            adv = i.adv_var
+            # adv = compute_advantages(self.discount,
+            #                          self.gae_lambda,
+            #                          self.max_path_length,
+            #                          i.baseline_var,
+            #                          rewards,
+            #                          name='adv')
             adv_flat = flatten_batch(adv, name='adv_flat')
             adv_valid = filter_valids(adv_flat,
                                       i.flat.valid_var,
                                       name='adv_valid')
 
-            if self.policy.recurrent:
-                adv = tf.reshape(adv, [-1, self.max_path_length])
+            # if self.policy.recurrent:
+            #     adv = tf.reshape(adv, [-1, self.max_path_length])
 
             # Optionally normalize advantages
             eps = tf.constant(1e-8, dtype=tf.float32)
@@ -468,6 +475,11 @@ class NPO(BatchPolopt):
                 self._policy_opt_inputs),
                                                  pol_mean_kl,
                                                  log_name='f_policy_kl')
+
+            self._f_adv = compile_function(flatten_inputs(
+                self._policy_opt_inputs),
+                                                 adv,
+                                                 log_name='f_policy_adv')
 
             self._f_rewards = compile_function(flatten_inputs(
                 self._policy_opt_inputs),
@@ -632,6 +644,7 @@ class NPO(BatchPolopt):
             reward_var=samples_data['rewards'],
             baseline_var=samples_data['baselines'],
             valid_var=samples_data['valids'],
+            adv_var=samples_data['advantages'],
             policy_state_info_vars_list=policy_state_info_list,
             policy_old_dist_info_vars_list=policy_old_dist_info_list,
         )
@@ -701,6 +714,7 @@ class NPO(BatchPolopt):
         del data['_policy_opt_inputs']
         del data['_f_policy_entropy']
         del data['_f_policy_kl']
+        del data['_f_adv']
         del data['_f_rewards']
         del data['_f_returns']
         return data

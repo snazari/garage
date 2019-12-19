@@ -11,6 +11,7 @@ from garage.tf.algos.td3 import TD3
 from garage.tf.algos.tnpg import TNPG
 from garage.tf.algos.trpo import TRPO
 from garage.tf.algos.vpg import VPG
+from garage.tf.algos.rl2 import RL2
 
 __all__ = [
     'BatchPolopt',
@@ -25,4 +26,5 @@ __all__ = [
     'TNPG',
     'TRPO',
     'VPG',
+    'RL2'
 ]

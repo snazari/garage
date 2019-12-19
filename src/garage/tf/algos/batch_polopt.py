@@ -109,6 +109,8 @@ class BatchPolopt(RLAlgorithm):
 
         """
         paths = self.process_samples(itr, paths)
+        # import pdb
+        # pdb.set_trace()
         self.log_diagnostics(paths)
         logger.log('Optimizing policy...')
         self.optimize_policy(itr, paths)
@@ -177,16 +179,28 @@ class BatchPolopt(RLAlgorithm):
                     agent_infos=path['agent_infos']) for path in paths
             ]
 
-        if hasattr(self.baseline, 'predict_n'):
-            all_path_baselines = self.baseline.predict_n(paths)
-        else:
-            all_path_baselines = [
-                self.baseline.predict(path) for path in paths
-            ]
+        # 1) compute discounted rewards (returns)
+        for idx, path in enumerate(paths):
+            path["returns"] = np_tensor_utils.discount_cumsum(path["rewards"], self.discount)
 
+        # 2) fit baseline estimator using the path returns and predict the return baselines
+        for path in paths:
+            self.baseline.fit([path])
+            baselines.append(self.baseline.predict(path))
+
+        # all_path_baselines = [self.baseline.predict(path) for path in paths]
+
+        # if hasattr(self.baseline, 'predict_n'):
+        #     all_path_baselines = self.baseline.predict_n(paths)
+        # else:
+        #     all_path_baselines = [
+        #         self.baseline.predict(path) for path in paths
+        #     ]
+
+        # compute advantages and adjusted rewards
         for idx, path in enumerate(paths):
             total_steps += len(path['rewards'])
-            path_baselines = np.append(all_path_baselines[idx], 0)
+            path_baselines = np.append(baselines[idx], 0)
             deltas = (path['rewards'] + self.discount * path_baselines[1:] -
                       path_baselines[:-1])
             path['advantages'] = np_tensor_utils.discount_cumsum(
@@ -194,14 +208,7 @@ class BatchPolopt(RLAlgorithm):
             path['deltas'] = deltas
 
         for idx, path in enumerate(paths):
-            # baselines
-            path['baselines'] = all_path_baselines[idx]
-            baselines.append(path['baselines'])
-
-            # returns
-            path['returns'] = np_tensor_utils.discount_cumsum(
-                path['rewards'], self.discount)
-            returns.append(path['returns'])
+            path['baselines'] = baselines[idx]
 
         # make all paths the same length
         obs = [path['observations'] for path in paths]
@@ -215,6 +222,10 @@ class BatchPolopt(RLAlgorithm):
 
         returns = [path['returns'] for path in paths]
         returns = tensor_utils.pad_tensor_n(returns, max_path_length)
+
+        advantages = [path['advantages'] for path in paths]
+        advantages = (advantages - np.mean(advantages)) / (np.std(advantages) + 1e-8)
+        advantages = tensor_utils.pad_tensor_n(advantages, max_path_length)
 
         baselines = tensor_utils.pad_tensor_n(baselines, max_path_length)
 
@@ -247,12 +258,16 @@ class BatchPolopt(RLAlgorithm):
             rewards=rewards,
             baselines=baselines,
             returns=returns,
+            advantages=advantages,
             valids=valids,
             agent_infos=agent_infos,
             env_infos=env_infos,
             paths=paths,
             average_return=np.mean(undiscounted_returns),
         )
+
+        import pdb
+        pdb.set_trace()
 
         tabular.record('Iteration', itr)
         tabular.record('AverageDiscountedReturn', average_discounted_return)

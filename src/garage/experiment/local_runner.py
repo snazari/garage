@@ -8,6 +8,7 @@ from dowel import logger, tabular
 from garage.experiment.deterministic import get_seed, set_seed
 from garage.experiment.snapshotter import Snapshotter
 from garage.sampler import parallel_sampler
+from garage.misc import tensor_utils as np_tensor_utils
 
 
 class ExperimentStats:
@@ -204,8 +205,10 @@ class LocalRunner:
         """
         paths = self._sampler.obtain_samples(
             itr, (batch_size or self._train_args.batch_size))
-
-        self._stats.total_env_steps += sum([len(p['rewards']) for p in paths])
+        if type(paths) == dict:
+            self._stats.total_env_steps += sum([len(p['rewards']) for p in paths])
+        else:
+            self._stats.total_env_steps += sum([sum([len(p['rewards']) for p in path]) for _, path in paths.items()])
 
         return paths
 
