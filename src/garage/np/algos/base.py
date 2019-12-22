@@ -25,4 +25,13 @@ class RLAlgorithm(abc.ABC):
             The average return in last epoch cycle or None.
 
         """
-        pass
+
+    @abc.abstractmethod
+    def evaluate_performance(self, batch):
+        """Evaluate the performance of the algorithm.
+
+        Args:
+            batch (dict): A dict of evaluation trajectories, representing
+                the best current performance of the algorithm.
+
+        """

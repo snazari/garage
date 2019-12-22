@@ -208,16 +208,30 @@ class DQN(OffPolicyRLAlgorithm):
 
         if itr % self.steps_per_epoch == 0:
             if self.evaluate:
-                mean100ep_rewards = round(np.mean(self.episode_rewards[-100:]),
-                                          1)
-                mean100ep_qf_loss = np.mean(self.episode_qf_losses[-100:])
-                tabular.record('Epoch', epoch)
-                tabular.record('AverageReturn', np.mean(self.episode_rewards))
-                tabular.record('StdReturn', np.std(self.episode_rewards))
-                tabular.record('Episode100RewardMean', mean100ep_rewards)
-                tabular.record('{}/Episode100LossMean'.format(self.qf.name),
-                               mean100ep_qf_loss)
+                evaluation_batch = dict(
+                    epoch=epoch,
+                    episode_rewards=self.episode_rewards,
+                    mean100ep_rewards=round(
+                        np.mean(self.episode_rewards[-100:]), 1),
+                    mean100ep_qf_loss=np.mean(self.episode_qf_losses[-100:]))
+                self.evaluate_performance(evaluation_batch)
+
         return last_average_return
+
+    def evaluate_performance(self, batch):
+        """Evaluate the performance of the algorithm.
+
+        Args:
+            batch (dict): A dict of evaluation trajectories, representing
+                the best current performance of the algorithm.
+
+        """
+        tabular.record('Epoch', batch['epoch'])
+        tabular.record('AverageReturn', np.mean(batch['episode_rewards']))
+        tabular.record('StdReturn', np.std(batch['episode_rewards']))
+        tabular.record('Episode100RewardMean', batch['mean100ep_rewards'])
+        tabular.record('{}/Episode100LossMean'.format(self.qf.name),
+                       batch['mean100ep_qf_loss'])
 
     def optimize_policy(self, itr, samples_data):
         """Optimize network using experiences from replay buffer.

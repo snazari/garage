@@ -284,24 +284,16 @@ class DDPG(OffPolicyRLAlgorithm):
             logger.log('Training finished')
 
             if self.evaluate:
-                tabular.record('Epoch', epoch)
-                tabular.record('AverageReturn', np.mean(self.episode_rewards))
-                tabular.record('StdReturn', np.std(self.episode_rewards))
-                tabular.record('Policy/AveragePolicyLoss',
-                               np.mean(self.episode_policy_losses))
-                tabular.record('QFunction/AverageQFunctionLoss',
-                               np.mean(self.episode_qf_losses))
-                tabular.record('QFunction/AverageQ', np.mean(self.epoch_qs))
-                tabular.record('QFunction/MaxQ', np.max(self.epoch_qs))
-                tabular.record('QFunction/AverageAbsQ',
-                               np.mean(np.abs(self.epoch_qs)))
-                tabular.record('QFunction/AverageY', np.mean(self.epoch_ys))
-                tabular.record('QFunction/MaxY', np.max(self.epoch_ys))
-                tabular.record('QFunction/AverageAbsY',
-                               np.mean(np.abs(self.epoch_ys)))
-                if self.input_include_goal:
-                    tabular.record('AverageSuccessRate',
-                                   np.mean(self.success_history))
+                evaluation_batch = dict(
+                    epoch=epoch,
+                    episode_rewards=self.episode_rewards,
+                    episode_policy_losses=self.episode_policy_losses,
+                    episode_qf_losses=self.episode_qf_losses,
+                    epoch_qs=self.epoch_qs,
+                    epoch_ys=self.epoch_ys,
+                    success_history=self.success_history)
+
+                self.evaluate_performance(evaluation_batch)
 
             if not self.smooth_return:
                 self.episode_rewards = []
@@ -312,6 +304,33 @@ class DDPG(OffPolicyRLAlgorithm):
 
             self.success_history.clear()
         return last_average_return
+
+    def evaluate_performance(self, batch):
+        """Evaluate the performance of the algorithm.
+
+        Args:
+            batch (dict): A dict of evaluation trajectories, representing
+                the best current performance of the algorithm.
+
+        """
+        tabular.record('Epoch', batch['epoch'])
+        tabular.record('AverageReturn', np.mean(batch['episode_rewards']))
+        tabular.record('StdReturn', np.std(batch['episode_rewards']))
+        tabular.record('Policy/AveragePolicyLoss',
+                       np.mean(batch['episode_policy_losses']))
+        tabular.record('QFunction/AverageQFunctionLoss',
+                       np.mean(batch['episode_qf_losses']))
+        tabular.record('QFunction/AverageQ', np.mean(batch['epoch_qs']))
+        tabular.record('QFunction/MaxQ', np.max(batch['epoch_qs']))
+        tabular.record('QFunction/AverageAbsQ',
+                       np.mean(np.abs(batch['epoch_qs'])))
+        tabular.record('QFunction/AverageY', np.mean(batch['epoch_ys']))
+        tabular.record('QFunction/MaxY', np.max(batch['epoch_ys']))
+        tabular.record('QFunction/AverageAbsY',
+                       np.mean(np.abs(batch['epoch_ys'])))
+        if self.input_include_goal:
+            tabular.record('AverageSuccessRate',
+                           np.mean(batch['success_history']))
 
     def optimize_policy(self, itr, samples_data):
         """Perform algorithm optimizing.

@@ -254,19 +254,37 @@ class BatchPolopt(RLAlgorithm):
             average_return=np.mean(undiscounted_returns),
         )
 
-        tabular.record('Iteration', itr)
-        tabular.record('AverageDiscountedReturn', average_discounted_return)
-        tabular.record('AverageReturn', np.mean(undiscounted_returns))
-        tabular.record('Extras/EpisodeRewardMean',
-                       np.mean(self.episode_reward_mean))
-        tabular.record('NumTrajs', len(paths))
-        tabular.record('Entropy', ent)
-        tabular.record('Perplexity', np.exp(ent))
-        tabular.record('StdReturn', np.std(undiscounted_returns))
-        tabular.record('MaxReturn', np.max(undiscounted_returns))
-        tabular.record('MinReturn', np.min(undiscounted_returns))
+        evaluation_batch = dict(
+            itr=itr,
+            average_discounted_return=average_discounted_return,
+            episode_reward_mean=self.episode_reward_mean,
+            ent=ent,
+            paths=paths,
+            undiscounted_returns=undiscounted_returns)
+        self.evaluate_performance(evaluation_batch)
 
         return samples_data
+
+    def evaluate_performance(self, batch):
+        """Evaluate the performance of the algorithm.
+
+        Args:
+            batch (dict): A dict of evaluation trajectories, representing
+                the best current performance of the algorithm.
+
+        """
+        tabular.record('Iteration', batch['itr'])
+        tabular.record('AverageDiscountedReturn',
+                       batch['average_discounted_return'])
+        tabular.record('AverageReturn', np.mean(batch['undiscounted_returns']))
+        tabular.record('Extras/EpisodeRewardMean',
+                       np.mean(batch['episode_reward_mean']))
+        tabular.record('NumTrajs', len(batch['paths']))
+        tabular.record('Entropy', batch['ent'])
+        tabular.record('Perplexity', np.exp(batch['ent']))
+        tabular.record('StdReturn', np.std(batch['undiscounted_returns']))
+        tabular.record('MaxReturn', np.max(batch['undiscounted_returns']))
+        tabular.record('MinReturn', np.min(batch['undiscounted_returns']))
 
     def init_opt(self):
         """Initialize the optimization procedure.

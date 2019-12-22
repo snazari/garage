@@ -140,6 +140,18 @@ class OffPolicyRLAlgorithm(RLAlgorithm):
 
         return samples_data
 
+    @abstractmethod
+    def evaluate_performance(self, batch):
+        """Evaluate the performance of the algorithm.
+
+        Args:
+            batch (dict): A dict of evaluation trajectories, representing
+                the best current performance of the algorithm.
+
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def init_opt(self):
         # pylint: disable=no-self-use
         """Initialize the optimization procedure.
@@ -147,6 +159,7 @@ class OffPolicyRLAlgorithm(RLAlgorithm):
         If using tensorflow, this may
         include declaring all the variables and compiling functions.
         """
+        raise NotImplementedError
 
     @abstractmethod
     def optimize_policy(self, itr, samples_data):
